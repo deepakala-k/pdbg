@@ -48,11 +48,117 @@ static const char *take_name(const char *name)
 	return name;
 }
 
+static const char *get_unitname(const struct pdbg_target *node)
+{
+	const char *c = strchr(node->dn_name, '@');
+
+	if (!c)
+		return NULL;
+
+	return c + 1;
+}
+
+/* The moment any number is found, in a string:
+   separate the string into number and string without numbers.
+   Return the number found, update the string passed to chop the number from it*/
+unsigned int strip_num(char *str) 
+{
+    unsigned int only_number;
+    int len = strlen(str);
+    char new_num_str[len];
+    int i;
+
+    for(i = 0; i < len; i++) 
+    {
+        if(isdigit(str[i])) 
+        {
+            strcpy(new_num_str, &str[i]);
+            break;
+        }
+    }
+    str[i] = '\0';
+    only_number = atoi(new_num_str);
+    return only_number;
+}
+
+static int dt_cmp_subnodes(const struct pdbg_target *a, const struct pdbg_target *b)
+{
+	const char *a_unit = get_unitname(a);
+	const char *b_unit = get_unitname(b);
+	ptrdiff_t basenamelen = a_unit - a->dn_name;
+	/* sort hex unit addresses by number */
+	if (a_unit && b_unit && !strncmp(a->dn_name, b->dn_name, basenamelen)) {
+		unsigned long long a_num, b_num;
+		char *a_end, *b_end;
+
+		a_num = strtoul(a_unit, &a_end, 16);
+		b_num = strtoul(b_unit, &b_end, 16);
+
+		/* only compare if the unit addr parsed correctly */
+		if (*a_end == 0 && *b_end == 0)
+			return (a_num > b_num) - (a_num < b_num);
+	}
+  char a_name_without_num[strlen(a->dn_name) + 1];
+  char b_name_without_num[strlen(b->dn_name) + 1];
+  unsigned int a_only_num = 0, b_only_num = 0;
+  
+  /* Create a copy as we are going to chop the number from it and we dont want to update the original string */
+  strcpy(a_name_without_num, a->dn_name);
+  strcpy(b_name_without_num, b->dn_name);
+  
+  /* Collect the numbers into variables to compare */
+  a_only_num = strip_num(a_name_without_num);
+  b_only_num = strip_num(b_name_without_num);
+  
+  //If both of the targets are of the same category, sort using the number at the end
+  if(strcmp(a_name_without_num, b_name_without_num) == 0 && (a_only_num) && (b_only_num) )
+  {
+     return (a_only_num > b_only_num) - (a_only_num < b_only_num);
+  }
+	return strcmp(a->dn_name, b->dn_name);
+}
+
+/* Find the class the target belongs to, and add the target to 
+   the list at a specific position so that it remains sorted */  
+void sort_and_add_target(struct pdbg_target *target)
+{
+	struct pdbg_target_class *target_class;
+  target_class = get_target_class(target);
+  
+  struct pdbg_target *node = NULL;
+  if (list_empty(&target_class->targets)) 
+  {
+    list_add(&target_class->targets, &target->class_link);
+    return;
+  }
+  
+  bool addBefore = false;
+  pdbg_for_each_target(target_class->name, NULL, node)
+  {
+    int cmp = dt_cmp_subnodes(node, target);
+    
+    /* insert before the first node that's larger
+     * the the node we're inserting */
+    if (cmp > 0)
+    {
+      addBefore = true;
+    	break;
+    }
+  }
+  if(addBefore)
+  {
+    list_add_before(&target_class->targets, &target->class_link, &node->class_link);
+    return;
+  }
+
+  list_add_tail(&target_class->targets, &target->class_link);
+}
+
 /* Adds information representing an actual target */
-static struct pdbg_target *dt_pdbg_target_new(const void *fdt, int node_offset)
+static struct pdbg_target *dt_pdbg_target_new(const void *fdt, int node_offset, const char *name)
 {
 	struct pdbg_target *target;
-	struct pdbg_target_class *target_class;
+//	struct pdbg_target_class *target_class;
 	const struct hw_unit_info *hw_info = NULL;
 	const struct fdt_property *prop;
 	size_t size;
@@ -81,14 +187,14 @@ static struct pdbg_target *dt_pdbg_target_new(const void *fdt, int node_offset)
 		abort();
 	}
 
-	/* hw_info->hw_unit points to a per-target struct type. This
-	 * works because the first member in the per-target struct is
-	 * guaranteed to be the struct pdbg_target (see the comment
-	 * above DECLARE_HW_UNIT). */
+  /* hw_info->hw_unit points to a per-target struct type. This
+   * works because the first member in the per-target struct is
+   * guaranteed to be the struct pdbg_target (see the comment
+   * above DECLARE_HW_UNIT). */
 	memcpy(target, hw_info->hw_unit, size);
-	target_class = get_target_class(target);
-	list_add_tail(&target_class->targets, &target->class_link);
+  target->dn_name = take_name(name);
 
+  sort_and_add_target(target);
 	return target;
 }
 
@@ -98,7 +204,7 @@ static struct pdbg_target *dt_new_node(const char *name, void *fdt, int node_off
 	size_t size = sizeof(*node);
 
 	if (fdt)
-		node = dt_pdbg_target_new(fdt, node_offset);
+		node = dt_pdbg_target_new(fdt, node_offset, name);
 
 	if (!node)
 		node = calloc(1, size);
@@ -118,39 +224,6 @@ static struct pdbg_target *dt_new_node(const char *name, void *fdt, int node_off
 	node->phandle = ++last_phandle;
 
 	return node;
-}
-
-static const char *get_unitname(const struct pdbg_target *node)
-{
-	const char *c = strchr(node->dn_name, '@');
-
-	if (!c)
-		return NULL;
-
-	return c + 1;
-}
-
-static int dt_cmp_subnodes(const struct pdbg_target *a, const struct pdbg_target *b)
-{
-	const char *a_unit = get_unitname(a);
-	const char *b_unit = get_unitname(b);
-
-	ptrdiff_t basenamelen = a_unit - a->dn_name;
-
-	/* sort hex unit addresses by number */
-	if (a_unit && b_unit && !strncmp(a->dn_name, b->dn_name, basenamelen)) {
-		unsigned long long a_num, b_num;
-		char *a_end, *b_end;
-
-		a_num = strtoul(a_unit, &a_end, 16);
-		b_num = strtoul(b_unit, &b_end, 16);
-
-		/* only compare if the unit addr parsed correctly */
-		if (*a_end == 0 && *b_end == 0)
-			return (a_num > b_num) - (a_num < b_num);
-	}
-
-	return strcmp(a->dn_name, b->dn_name);
 }
 
 static bool dt_attach_node(struct pdbg_target *parent, struct pdbg_target *child)
@@ -179,7 +252,9 @@ static bool dt_attach_node(struct pdbg_target *parent, struct pdbg_target *child
 		/* insert before the first node that's larger
 		 * the the node we're inserting */
 		if (cmp > 0)
+    {
 			break;
+    }
 	}
 
 	list_add_before(&parent->children, &child->list, &node->list);
