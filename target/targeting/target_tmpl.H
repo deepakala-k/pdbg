@@ -2,6 +2,7 @@
 
 #include <libfdt.h>
 #include <targeting/common/entitypath.H>
+#include <targeting/endian_utils.H>
 #include <targeting/xmltohb/attributeenums.H>
 #include <targeting/xmltohb/attributetraits.H>
 #include <targeting/xmltohb/targAttrIdToName.H>
@@ -12,6 +13,7 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+
 namespace TARGETING
 {
 
@@ -257,6 +259,14 @@ bool Target::tryGetAttrImpl(T& o_attrValue) const
             }
             TraitType temp{};
             std::memcpy(&temp, span.data(), span.size());
+
+            // If integral and multi-byte, swap from BE to host.
+            if constexpr (std::is_integral_v<TraitType> &&
+                          sizeof(TraitType) > 1)
+            {
+                temp = util::betoh_integral<TraitType>(temp);
+            }
+
             o_attrValue = static_cast<T>(temp);
             return true;
         }
@@ -293,7 +303,15 @@ void Target::setAttrImpl(const T& attrValue)
         }
         else
         {
-            fdtSetRawProperty(_fdt, _offset, propName, &attrValue, sizeof(T));
+            // scalar/POD: convert to BE if integral multi-byte
+            using TraitType = typename AttributeTraits<A>::Type;
+            TraitType tmp = attrValue;
+            if constexpr (std::is_integral_v<TraitType> &&
+                          sizeof(TraitType) > 1)
+            {
+                tmp = util::htobe_integral<TraitType>(tmp);
+            }
+            fdtSetRawProperty(_fdt, _offset, propName, &tmp, sizeof(TraitType));
         }
     }
 }
