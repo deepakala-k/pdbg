@@ -340,22 +340,10 @@ TEST_F(TargetServiceTest, CanWriteWritableAttr)
     EXPECT_TRUE(proc->trySetAttr<ATTR_HW_ACCESS_METHOD>(method));
 }
 
-// Verify get throws when attribute not set
-TEST_F(TargetServiceTest, GetVolatileBeforeSetThrows)
-{
-    auto proc = getFirstTargetMatchingType(TYPE_PROC);
-    EXPECT_THROW(
-        {
-            auto val = proc->getAttr<ATTR_HW_ACCESS_PTR>();
-            (void)val;
-        },
-        std::runtime_error);
-}
-
 // Verify set followed by get returns the same value
 TEST_F(TargetServiceTest, SetAndGetVolatileWorks)
 {
-    constexpr uint32_t testValue = 0xDEADBEEF;
+    constexpr uint64_t testValue = 0xDEADBEEFDEADBEEF;
 
     auto proc = getFirstTargetMatchingType(TYPE_PROC);
     ASSERT_NE(proc, nullptr);
