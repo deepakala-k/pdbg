@@ -202,80 +202,52 @@ void Target::setVolatileAttr(const typename AttributeTraits<A>::Type& attrValue)
 template <ATTRIBUTE_ID A, typename T>
 bool Target::tryGetAttrImpl(T& o_attrValue) const
 {
-    if (auto nameOpt = tryGetAttrName<A>())
+    if (auto nameOpt = tryGetAttrName<A>(); nameOpt)
     {
-        const std::string& propName = *nameOpt;
+        const auto& propName = *nameOpt;
         auto propData = fdtGetProperty(_fdt, _offset, propName);
         if (!propData.has_value())
             return false;
 
         auto span = propData.value();
         using TraitType = typename AttributeTraits<A>::Type;
-        using DecayedType =
-            std::remove_cv_t<std::remove_reference_t<TraitType>>;
 
-        // Handle string attributes
+        // Helper lambda to copy into contiguous storage safely
+        auto copyBytes = [&](auto& dest) {
+            if (span.size() > sizeof(dest))
+                return false;
+            std::memset(&dest, 0, sizeof(dest));
+            std::memcpy(&dest, span.data(), span.size());
+            return true;
+        };
+
         if constexpr (isStringAttr<A>())
         {
             o_attrValue.assign(reinterpret_cast<const char*>(span.data()),
                                span.size());
-            return true;
         }
-
-        // Handle entity path attributes
         else if constexpr (isEntityPathAttr<A>())
         {
             o_attrValue = EntityPath::fromBinary(span);
             return o_attrValue.getSize() > 0;
         }
-
-        // Handle fixed-size std::array attributes
-        else if constexpr (isStdArrayAttr<A>())
+        else if constexpr (isStdArrayAttr<A>() || isCharArrayAttr<A>() ||
+                           std::is_array_v<TraitType>)
         {
-            if (span.size() > sizeof(TraitType))
-                return false;
-            std::memset(o_attrValue.data(), 0, sizeof(TraitType));
-            std::memcpy(o_attrValue.data(), span.data(), span.size());
-            return true;
+            return copyBytes(o_attrValue);
         }
-
-        // Handle fixed-size char array attributes
-        else if constexpr (isCharArrayAttr<A>())
-        {
-            if (span.size() > sizeof(TraitType))
-                return false;
-            std::memset(&o_attrValue, 0, sizeof(TraitType));
-            std::memcpy(&o_attrValue, span.data(), span.size());
-            return true;
-        }
-
-        // Handle C-style arrays (e.g., uint8_t[4])
-        else if constexpr (std::is_array_v<DecayedType>)
-        {
-            if (span.size() > sizeof(TraitType))
-                return false;
-            std::memset(&o_attrValue, 0, sizeof(TraitType));
-            std::memcpy(&o_attrValue, span.data(), span.size());
-            return true;
-        }
-
-        // Handle scalar / POD attributes
         else
-        {
-            if (span.size() > sizeof(TraitType))
+        { // scalar/POD
+            if (!copyBytes(o_attrValue))
                 return false;
-            TraitType temp{};
-            std::memcpy(&temp, span.data(), span.size());
-
             if constexpr (std::is_integral_v<TraitType> &&
                           sizeof(TraitType) > 1)
             {
-                temp = util::betoh_integral<TraitType>(temp);
+                o_attrValue = util::betoh_integral<TraitType>(o_attrValue);
             }
-
-            o_attrValue = static_cast<T>(temp);
-            return true;
         }
+
+        return true;
     }
     return false;
 }
@@ -283,9 +255,15 @@ bool Target::tryGetAttrImpl(T& o_attrValue) const
 template <ATTRIBUTE_ID A, typename T>
 bool Target::trySetAttrImpl(const T& attrValue)
 {
-    if (auto nameOpt = tryGetAttrName<A>())
+    if (auto nameOpt = tryGetAttrName<A>(); nameOpt)
     {
-        const std::string& propName = *nameOpt;
+        const auto& propName = *nameOpt;
+
+        auto writeSpan = [&](auto& value) {
+            fdtSetRawProperty(_fdt, _offset, propName,
+                              reinterpret_cast<const uint8_t*>(&value),
+                              sizeof(value));
+        };
 
         if constexpr (isStringAttr<A>())
         {
@@ -295,26 +273,13 @@ bool Target::trySetAttrImpl(const T& attrValue)
         {
             fdtSetProperty(_fdt, _offset, propName, attrValue.toBinary());
         }
-        else if constexpr (isStdArrayAttr<A>())
+        else if constexpr (isStdArrayAttr<A>() || isCharArrayAttr<A>() ||
+                           std::is_array_v<T>)
         {
-            const char* cstr = attrValue.data();
-            size_t len = strnlen(cstr, attrValue.size());
-            fdtSetRawProperty(_fdt, _offset, propName, cstr, len + 1);
-        }
-        else if constexpr (isCharArrayAttr<A>())
-        {
-            const char* cstr = reinterpret_cast<const char*>(&attrValue);
-            size_t len = strnlen(cstr, sizeof(T));
-            fdtSetRawProperty(_fdt, _offset, propName, cstr, len + 1);
-        }
-        else if constexpr (std::is_array_v<typename AttributeTraits<A>::Type>)
-        {
-            using ArrT = typename AttributeTraits<A>::Type;
-            fdtSetRawProperty(_fdt, _offset, propName, attrValue, sizeof(ArrT));
+            writeSpan(attrValue);
         }
         else
-        {
-            // scalar/POD: convert to BE if integral multi-byte
+        { // scalar/POD
             using TraitType = typename AttributeTraits<A>::Type;
             TraitType tmp = attrValue;
             if constexpr (std::is_integral_v<TraitType> &&
@@ -322,9 +287,12 @@ bool Target::trySetAttrImpl(const T& attrValue)
             {
                 tmp = util::htobe_integral<TraitType>(tmp);
             }
-            fdtSetRawProperty(_fdt, _offset, propName, &tmp, sizeof(TraitType));
+            writeSpan(tmp);
         }
+
+        return true;
     }
+
     return false;
 }
 
