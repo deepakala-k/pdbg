@@ -205,6 +205,7 @@ bool Target::tryGetAttrImpl(T& o_attrValue) const
     if (auto nameOpt = tryGetAttrName<A>(); nameOpt)
     {
         const auto& propName = *nameOpt;
+        std::cout << "Target::tryGetAttr name " << propName << std::endl;
         auto propData = fdtGetProperty(_fdt, _offset, propName);
         if (!propData.has_value())
             return false;
@@ -257,6 +258,7 @@ bool Target::trySetAttrImpl(const T& attrValue)
 {
     if (auto nameOpt = tryGetAttrName<A>(); nameOpt)
     {
+        std::cout << "Target::trySetAttr name " << *nameOpt << " value "<<  attrValue << std::endl;
         const auto& propName = *nameOpt;
 
         auto writeSpan = [&](auto& value) {

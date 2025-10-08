@@ -220,6 +220,8 @@ int send_all(int fd, std::span<const std::byte> cmd)
 int getCfam(TARGETING::ConstTargetPtr target, std::uint32_t addr,
             std::uint32_t& value)
 {
+    std::cout << "DEMO: transport getCfam " << std::endl;
+
     auto fdPtrOpt = prepareCfamAccess(target, addr);
     if (!fdPtrOpt)
     {
@@ -243,6 +245,8 @@ int getCfam(TARGETING::ConstTargetPtr target, std::uint32_t addr,
 int putCfam(TARGETING::ConstTargetPtr target, std::uint32_t addr,
             std::uint32_t value)
 {
+    std::cout << "DEMO: transport getCfam " << std::endl;
+
     auto fdPtrOpt = prepareCfamAccess(target, addr);
     if (!fdPtrOpt)
     {
@@ -265,6 +269,7 @@ int putCfam(TARGETING::ConstTargetPtr target, std::uint32_t addr,
 int getScom(TARGETING::ConstTargetPtr target, std::uint64_t addr,
             std::uint64_t& value)
 {
+    std::cout << "DEMO: transport getScom " << std::endl;
     auto fdOpt = prepareScomAccess(target, O_RDONLY);
     if (!fdOpt)
     {
@@ -290,6 +295,7 @@ int getScom(TARGETING::ConstTargetPtr target, std::uint64_t addr,
 int putScom(TARGETING::ConstTargetPtr target, std::uint64_t addr,
             std::uint64_t value)
 {
+    std::cout << "DEMO: transport putScom " << std::endl;
     auto fdOpt = prepareScomAccess(target, O_RDWR);
     if (!fdOpt)
     {

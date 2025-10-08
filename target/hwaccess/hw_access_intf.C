@@ -5,18 +5,21 @@
 
 namespace hwaccess
 {
-using HwAccessPtr = TARGETING::AttributeTraits<TARGETING::ATTR_HW_ACCESS_PTR>::Type;
+using HwAccessPtr =
+    TARGETING::AttributeTraits<TARGETING::ATTR_HW_ACCESS_PTR>::Type;
 
-int HwAccessIntf::getCfamRegister(ConstTargetPtr_t target, uint32_t addr, uint32_t& val)
+int HwAccessIntf::getCfamRegister(ConstTargetPtr_t target, uint32_t addr,
+                                  uint32_t& val)
 {
-    if(target == nullptr)
+    if (target == nullptr)
     {
         std::cerr << "getCfamRegister: target is nullptr" << std::endl;
         return -1;
     }
 
     auto accessPtr = target->getAttr<TARGETING::ATTR_HW_ACCESS_PTR>();
-    HwBaseAccess* hwAccessPtr = reinterpret_cast<HwBaseAccess*>(static_cast<HwAccessPtr>(accessPtr));
+    HwBaseAccess* hwAccessPtr =
+        reinterpret_cast<HwBaseAccess*>(static_cast<HwAccessPtr>(accessPtr));
 
     if (hwAccessPtr == nullptr)
     {
@@ -27,16 +30,18 @@ int HwAccessIntf::getCfamRegister(ConstTargetPtr_t target, uint32_t addr, uint32
     return hwAccessPtr->getCfam(target, addr, val);
 }
 
-int HwAccessIntf::putCfamRegister(ConstTargetPtr_t target, uint32_t addr, uint32_t val)
+int HwAccessIntf::putCfamRegister(ConstTargetPtr_t target, uint32_t addr,
+                                  uint32_t val)
 {
-    if(target == nullptr)
+    if (target == nullptr)
     {
         std::cerr << "putCfamRegister: target is nullptr" << std::endl;
         return -1;
     }
 
     auto accessPtr = target->getAttr<TARGETING::ATTR_HW_ACCESS_PTR>();
-    HwBaseAccess* hwAccessPtr = reinterpret_cast<HwBaseAccess*>(static_cast<HwAccessPtr>(accessPtr));
+    HwBaseAccess* hwAccessPtr =
+        reinterpret_cast<HwBaseAccess*>(static_cast<HwAccessPtr>(accessPtr));
 
     if (hwAccessPtr == nullptr)
     {
@@ -47,16 +52,18 @@ int HwAccessIntf::putCfamRegister(ConstTargetPtr_t target, uint32_t addr, uint32
     return hwAccessPtr->putCfam(target, addr, val);
 }
 
-int HwAccessIntf::getScomRegister(ConstTargetPtr_t target, uint64_t addr, uint64_t& val)
+int HwAccessIntf::getScomRegister(ConstTargetPtr_t target, uint64_t addr,
+                                  uint64_t& val)
 {
-    if(target == nullptr)
+    if (target == nullptr)
     {
         std::cerr << "getScomRegister: target is nullptr" << std::endl;
         return -1;
     }
 
     auto accessPtr = target->getAttr<TARGETING::ATTR_HW_ACCESS_PTR>();
-    HwBaseAccess* hwAccessPtr = reinterpret_cast<HwBaseAccess*>(static_cast<HwAccessPtr>(accessPtr));
+    HwBaseAccess* hwAccessPtr =
+        reinterpret_cast<HwBaseAccess*>(static_cast<HwAccessPtr>(accessPtr));
 
     if (hwAccessPtr == nullptr)
     {
@@ -67,16 +74,18 @@ int HwAccessIntf::getScomRegister(ConstTargetPtr_t target, uint64_t addr, uint64
     return hwAccessPtr->getScom(target, addr, val);
 }
 
-int HwAccessIntf::putScomRegister(ConstTargetPtr_t target, uint64_t addr, uint64_t val)
+int HwAccessIntf::putScomRegister(ConstTargetPtr_t target, uint64_t addr,
+                                  uint64_t val)
 {
-    if(target == nullptr)
+    if (target == nullptr)
     {
         std::cerr << "putScomRegister: target is nullptr" << std::endl;
         return -1;
     }
 
     auto accessPtr = target->getAttr<TARGETING::ATTR_HW_ACCESS_PTR>();
-    HwBaseAccess* hwAccessPtr = reinterpret_cast<HwBaseAccess*>(static_cast<HwAccessPtr>(accessPtr));
+    HwBaseAccess* hwAccessPtr =
+        reinterpret_cast<HwBaseAccess*>(static_cast<HwAccessPtr>(accessPtr));
 
     if (hwAccessPtr == nullptr)
     {
@@ -89,15 +98,20 @@ int HwAccessIntf::putScomRegister(ConstTargetPtr_t target, uint64_t addr, uint64
 
 void* HwAccessIntf::getHwAccessPtr(HwAccessMethod& accessMethod)
 {
-    if(accessMethod == TARGETING::HW_ACCESS_METHOD_DIRECT_ACCESS)
+    if (accessMethod == TARGETING::HW_ACCESS_METHOD_DIRECT_ACCESS)
     {
+        std::cout << "DEMO HwAccessIntf::getHwAccessPtr retun DIRECT_ACCESS_PTR"
+                  << std::endl;
+
         return static_cast<void*>(&HwDirectAccess::getInstance());
     }
-    else if(accessMethod == TARGETING::HW_ACCESS_METHOD_SBEFIFO)
+    else if (accessMethod == TARGETING::HW_ACCESS_METHOD_SBEFIFO)
     {
+        std::cout << "DEMO HwAccessIntf::getHwAccessPtr retun SBEFIFO_PTR"
+                  << std::endl;
         return static_cast<void*>(&HwSbeAccess::getInstance());
     }
-    std::cerr << "getHwAccessPtr: HwAccessMethod is invalid" << std::endl;
+    std::cerr << "DEMO getHwAccessPtr: HwAccessMethod is invalid" << std::endl;
     return nullptr;
 }
-} //namespace hwaccess
+} // namespace hwaccess
