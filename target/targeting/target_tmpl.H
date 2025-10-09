@@ -258,7 +258,7 @@ bool Target::trySetAttrImpl(const T& attrValue)
 {
     if (auto nameOpt = tryGetAttrName<A>(); nameOpt)
     {
-        std::cout << "Target::trySetAttr name " << *nameOpt << " value "<<  attrValue << std::endl;
+        std::cout << "Target::trySetAttr name " << *nameOpt << std::endl;
         const auto& propName = *nameOpt;
 
         auto writeSpan = [&](auto& value) {
